@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Julia Nelson">
+<meta name="dcterms.date" content="2024-03-13">
+
+<title>Predicting American Adults’ Views on Abortion</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="Nelson_Julia_final_report_files/libs/clipboard/clipboard.min.js"></script>
+<script src="Nelson_Julia_final_report_files/libs/quarto-html/quarto.js"></script>
+<script src="Nelson_Julia_final_report_files/libs/quarto-html/popper.min.js"></script>
+<script src="Nelson_Julia_final_report_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="Nelson_Julia_final_report_files/libs/quarto-html/anchor.min.js"></script>
+<link href="Nelson_Julia_final_report_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="Nelson_Julia_final_report_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="Nelson_Julia_final_report_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="Nelson_Julia_final_report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="Nelson_Julia_final_report_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Predicting American Adults’ Views on Abortion</h1>
+<p class="subtitle lead"></p><p>Final Report<br>
+Data Science 2 with R (STAT 301-2)</p><p></p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Julia Nelson </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">March 13, 2024</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+</header>
+
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<a href="https://github.com/stat301-2-2024-winter/final-project-2-nelson-julia.git">Final Project GitHub</a>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+
+</div>
+</div>
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p>My objective is to predict whether American adults believe that abortion should be legal or banned based on their personal characteristics and political views. “Legal” indicates that a person believes abortion should be legal in all or most circumstances. “Banned” indicates that a person believes abortion should be illegal in all circumstances, or all circumstances excluding rape, incest, and when the mother’s life is at stake. This is a classification problem.</p>
+<p>Abortion is an important political, social, and civil rights issue in the United States, especially since the overturning of <em>Roe v. Wade</em> in 2022. Abortion rights will likely be a major deciding factor in the outcome of the upcoming 2024 presidential election. Thus it is useful to know where Americans stand on abortion, and what factors influence their views. My model seeks to predict support for abortion based on known information.</p>
+<p>The dataset I will use to build a predictive model is the <strong>American National Election Studies (ANES) 2020 Time Series Study</strong><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>. ANES surveys American voters before and after each presidential election, collecting demographics, public opinion, and political participation. This survey took place before the 2020 presidential election.</p>
+</section>
+<section id="data-overview" class="level2">
+<h2 class="anchored" data-anchor-id="data-overview">Data Overview</h2>
+<p>The dataset initially had 1000 variables and 8280 observations. As building a model with 999 predictor variables would be prohibitively difficult and time-consuming, I selected 30 variables to be predictors. 24 of these are categorical and the other 6 are numerical. I made sure to cover basic demographic information, such as age, gender, and income, as well as political identities and perspectives on various political and social issues. The full list of predictor variables is included in <a href="#appendix-list-of-variables">Appendix: List of Variables</a>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-dirty" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;1: 8280 American Adults’ Views on Abortion</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">abortion</th>
+<th style="text-align: right;">n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">legal</td>
+<td style="text-align: right;">4017</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">banned w/ exceptions</td>
+<td style="text-align: right;">1916</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">legal w/ proven need</td>
+<td style="text-align: right;">1097</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">banned</td>
+<td style="text-align: right;">870</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">NA/other/unsure</td>
+<td style="text-align: right;">380</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p>The dataset initially included six unique potential responses that participants could choose from when asked about their views on abortion, as well as an ‘NA’ category for participants who didn’t answer the question.</p>
+<p><a href="#tbl-dirty">Table&nbsp;1</a> shows that of the 8280 observations, 4017 survey participants believed abortion should always be legal, 1916 believed it should be banned with exceptions, 1097 believed it should be legal with proven need, and 870 thought it should be banned in all cases. In order to perform binary classification, I combined the “legal” and “legal with proven need” categories into one category for those who believe abortion should be legal in most circumstances. Likewise, I combined the “banned” and “banned with exceptions” categories into one category for those who believe abortion should be illegal in most circumstances.</p>
+<p>The other 380 participants were unsure about their view, had a view that wasn’t included in the survey, or didn’t answer the question. For simplicity, I combined them into one category in <a href="#tbl-dirty">Table&nbsp;1</a>. I removed these 380 observations from the dataset since their views on abortion are unknown or can’t be partitioned into “legal” and “banned.”</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-clean" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;2: 7900 American Adults’ Views on Abortion</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">abortion</th>
+<th style="text-align: right;">n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">legal</td>
+<td style="text-align: right;">5114</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">banned</td>
+<td style="text-align: right;">2786</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-clean">Table&nbsp;2</a> shows that under this consolidation, 7900 observations remained. 5114 participants believed abortion should generally be legal, and 2786 believed it should generally be banned. There is a class imbalance, with around 65% of participants in the “legal” category and the other 35% in the “banned” category.</p>
+<p>I performed an exploratory data analysis on the data to determine the distributions of each of the predictor vairables as well as their relationships to one another. The results of this EDA are included in [Appendix: EDA].</p>
+</section>
+<section id="methods" class="level2">
+<h2 class="anchored" data-anchor-id="methods">Methods</h2>
+<p>As stated above, this is a classification problem. In addition, this model is predictive. As the dataset is derived from a random sample of Americans, it is representative of the US population as a whole. The model can be used to predict individual support for abortion, as well as the support of the broader population.</p>
+<section id="splitting-data" class="level4">
+<h4 class="anchored" data-anchor-id="splitting-data">Splitting Data</h4>
+<p>The dataset was split using a 75/25 split. 75% of the data (5925 observations) was used to train the model and 25% of the data (1975 observations) was used to test the model. This ratio allows for both good predictive performance that can be generalized to the dataset and good assessment of model efficacy. I stratified the data by the outcome variable, abortion, in order to ensure similar proportions of each outcome represented in the testing and training data.</p>
+</section>
+<section id="resampling" class="level4">
+<h4 class="anchored" data-anchor-id="resampling">Resampling</h4>
+<p>I performed resampling before fitting any models directly to the training data. Under resampling, the training data was itself divided into training and testing categories. The training subset was used to fit the model, while the testing subset was used to evaluate the model. This was done multiple times, so that the efficacy of each model could be more accurately determined than if the model had only been fit once. This helps to improve model accuracy, as well as prevent overfitting, where the model is fit too closely to the training data and can’t be applied to new data as well.</p>
+<p>The resampling method I used was V-fold cross-validation. The training data was randomly split into 5 folds of similar size (around 1185 observations each). I once again stratified the data by the outcome variable, abortion, so that similar proportions of each outcome were represented in each fold. A model was created using 4 of the 5 folds, and the remaining fold was used to test the model. This was done using each fold as the testing fold. The whole process was repeated 3 times, so a total of 15 models were trained and tested. The final performance metric averages the 15 replicates. Either 5 folds with 3 repetitions or 10 folds with 5 repetitions are commonly used, and I chose the former due to the large number of categorical predictors, which increased model complexity and the time required to fit each model.</p>
+<p>I chose V-fold cross-validation due to its advantages over other resampling methods. It isn’t as time-consuming as leave-one-out cross-validation. Unlike Monte Carlo cross-validation, V-fold cross-validation creates mutually exclusive assessment sets.</p>
+</section>
+<section id="types-of-models" class="level4">
+<h4 class="anchored" data-anchor-id="types-of-models">Types of Models</h4>
+<p>I fit six different types of models to the folds: naive Bayes, logistic, elastic net, random forest, boosted tree, and k nearest neighbor.</p>
+<p>The naive Bayes model is a simple model that relies on probability and assumes that all predictors are independent of one another. My naive Bayes model serves as the baseline model, with which all other models will be compared to put their efficacy into context and determine if developing complex models was worthwhile. The naive Bayes model doesn’t have any parameters. I trained one naive Bayes model 15 times, for a total of 15 trainings.</p>
+<p>The logistic model is a parametric model that calculates the probability that each observation will be in either outcome category, and assigns observations to either category based on that likelihood. This model doesn’t have any parameters. I trained two logistic models 15 times, for a total of 30 trainings.</p>
+<p>The elastic net model is a parametric model that is a combination of two other models, the fused ridge and fused lasso models. It has two parameters: a penalty value that selects the most important features and prevents the model from being overfit, and a mixture value that determines what proportion of the model will be ridge and what proportion will be lasso. I tuned the penalty value to be explored over 5 levels from 10<sup>-10</sup> to 1, and the mixture value to be explored over 5 levels from 0 to 1 (0% ridge to 100% ridge). I trained 50 elastic net models 15 times, for a total of 750 trainings.</p>
+<p>The random forest model is a tree-based model that progressively segments the training data into simpler regions, like the branches of a tree. The outcome category each observation is predicted to have is based on its position in the tree. The random forest model has three parameters: the number of predictors randomly sampled at each split, the number of trees to be averaged for the final prediction, and the minimum number of data points required for the tree to be split further. I set the number of trees to 500, since models with larger tree counts took a prohibitively long time to run. I tuned the number of predictors to be explored over 5 levels from 5 to 15, and the minimum number of data points to be explored over 5 levels from 5 to 20. I trained 50 random forest models 15 times, for a total of 750 trainings.</p>
+<p>The boosted tree model is a tree-based model that combine multiple sequential trees into a stronger model, where the newer trees are trained on the older trees. This model has four parameters: the same three as the random forest model, as well as the learning rate, which measures the level of influence of each new tree. A value of 0 indicates no influence, while 1 indicates a great deal of influence. As before, I set the number of trees to 500. I tuned the number of predictors to be explored over 5 levels from 1 to 5, and tuned the minimum number of data points to be explored over 5 levels from 5 to 40. I tuned the learning rate to be explored over 10 levels from 10<sup>-5</sup> to 10<sup>-.1</sup>. I trained 500 boosted tree models 15 times, for a total of 7500 trainings.</p>
+<p>The k nearest neighbor model is a tree-based model which finds the “closest” (most similar) training data points to a new data point and predicts the value of the new data point based on those points. This model has one parameter, the number of closest data points, or neighbors, to be considered. I tuned the number of neighbors to be explored over 10 levels from 5 to 50. I trained 20 k nearest neighbor models 15 times, for a total of 300 trainings.</p>
+</section>
+<section id="recipes" class="level4">
+<h4 class="anchored" data-anchor-id="recipes">Recipes</h4>
+<p>I created four recipes in total: a baseline recipe for the parametric models, a baseline recipe for the tree-based models, a feature engineered recipe for the parametric models, and a feature engineered recipe for the tree-based models.</p>
+<p>Each model was first fit to a baseline recipe. This recipe contains only the basic steps required for a prediction to be produced. Missing values of categorical variables were imputed using that variable’s mode. Missing values of numerical variables were imputed using that variable’s mean. The categorical variables were transformed into numerical variables. All predictors with zero variance were removed, and all predictors were normalized. There is one difference between the baseline recipes for the parametric and tree-based models. The former split categorical variables with n categories into n-1 numerical variables, while the latter split categorical variables with n categories into n numerical variables.</p>
+<p>Each model was then fit to a feature engineered recipe, except for the naive Bayes model, which as the baseline model was only fit to the baseline recipe. As with the baseline recipe, all categorical variables were transformed into either n-1 (parametric) or n (tree-based) numerical variables, all predictors with zero variance were removed, and all predictors were normalized. Instead of using a variable’s mean or mode, missing values of all variables were imputed based on the values of the 10 closest neighboring points. Additionally, the feature engineered recipe removed two variables, happiness and anger. These were very similar to another variable, worry, and only served to make the recipe more complex without adding any extra insight. The square root of income was taken in order to normalize this variable. Plots with the relationship between happiness and worry and anger and worry, as well as a plot of the square root of income, can be found in [Appendix: EDA].</p>
+<p>I also added interaction terms to the parametric feature engineered recipe to account for relationships between variables. I determined the correlation between each of the numerical variables. Correlation ranges from -1 to 1, with 1 indicating a perfect positive relationship, -1 indicating a perfect negative relationship, and 0 indicating no relationship between two variables. I chose to add interaction terms between variables with |correlation| &gt; .60. Thus I added interaction terms between:</p>
+<ul>
+<li><p>Democratic approval and Republican approval (cor = -0.68)</p></li>
+<li><p>support for guaranteed income and support for universal health insurance (cor = .62)</p></li>
+</ul>
+<p>I determined the Cramer’s V between each of the categorical variables. Cramer’s V ranges from 0 to 1, with 1 indicating a perfect relationship and 0 indicating no relationship between two variables. I chose to add interaction terms between variables with Cramer’s V &gt; .50. Thus I added interaction terms between:</p>
+<ul>
+<li><p>right track and support for impeachment (CV = .54)</p></li>
+<li><p>presidential vote and support for impeachment (CV = .60)</p></li>
+<li><p>political spectrum and support for trans rights (CV = .56)</p></li>
+<li><p>political spectrum and support for impeachment (CV = .52)</p></li>
+</ul>
+<p>As a result, my parametric feature engineered recipe had a total of six interaction terms. The correlation and Cramer’s V tables are included in <a href="#appendix-correlation-cramers-v-analysis">Appendix: Correlation &amp; Cramer’s V Analysis</a>.</p>
+<p>The metric I used to compare models is accuracy. Accuracy measures the percent of predictions which matched the actual values. An accuracy value of 1.00 (100%) indicates that the predicted value matched the actual value for every data point. In this case the model was perfectly accurate. An accuracy value of .50 (50%) indicates that the predicted values matched the actual value for half of the data points. In this case the model was no better than random guessing. The final/winning model is the one with the highest accuracy.</p>
+</section>
+</section>
+<section id="model-building-selection-results" class="level2">
+<h2 class="anchored" data-anchor-id="model-building-selection-results">Model Building &amp; Selection Results</h2>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-elastic" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;3: Best Tuning Parameters for Elastic Net Model</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">recipe</th>
+<th style="text-align: right;">accuracy</th>
+<th style="text-align: right;">penalty</th>
+<th style="text-align: right;">mixture</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7997401</td>
+<td style="text-align: right;">0.0031623</td>
+<td style="text-align: right;">0.25</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.8004720</td>
+<td style="text-align: right;">0.0031623</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-elastic">Table&nbsp;3</a> shows the best tuning parameters for the elastic net model. The best baseline model had a penalty of .00316 and a mixture of .25, while the best feature engineered model had a penalty of .00316 and a mixture of 1.00. It seems that the most effective elastic net models have a high penalty, while the mixture isn’t particularly important. Further tuning could explore higher penalties with a variety of mixtures to find optimal parameter values.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-rf" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;4: Best Tuning Parameters for Random Forest Model</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">recipe</th>
+<th style="text-align: right;">accuracy</th>
+<th style="text-align: right;">mtry</th>
+<th style="text-align: right;">min_n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7977724</td>
+<td style="text-align: right;">15</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.7997973</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">16</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-rf">Table&nbsp;4</a> shows the best tuning parameters for the random forest model. The best baseline model had 15 predictors sampled at each split and a minimum of 5 data points for the tree to be split further. The best feature engineered model had 12 predictors sampled at each split and a minimum of 16 data points for the tree to be split further. It seems that the most effective random forest models have a high number of predictors sampled, while the minimum number of data points isn’t as important. Further tuning could explore higher numbers of predictors with a variety of minimum numbers of data points to find optimal parameter values.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-bt" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;5: Best Tuning Parameters for Boosted Tree Model</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">recipe</th>
+<th style="text-align: right;">accuracy</th>
+<th style="text-align: right;">mtry</th>
+<th style="text-align: right;">min_n</th>
+<th style="text-align: right;">learn_rate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7995715</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">0.0184785</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.8015406</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0.0184785</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-bt">Table&nbsp;5</a> shows the best tuning parameters for the boosted tree model. The best baseline model had 5 predictors sampled at each split, a minimum of 22 data points for the tree to be split further, and a learn rate of .0185. The best feature engineered model had 3 predictors sampled at each split, a minimum of 16 data points for the tree to be split further, and a learn rate of .0185. It seems that the most effective boosted tree models have a medium learn rate, while the number of predictors sampled and minimum data points aren’t as important. Further tuning could set the number of predictors and explore a variety of numbers of predictors and minimum numbers of data points to find optimal parameter values.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-knn" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;6: Best Tuning Parameters for K Nearest Neighbor Model</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">recipe</th>
+<th style="text-align: right;">accuracy</th>
+<th style="text-align: right;">neighbors</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7725064</td>
+<td style="text-align: right;">50</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.7786399</td>
+<td style="text-align: right;">50</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-knn">Table&nbsp;6</a> shows the best tuning parameters for the k nearest neighbor model. Both the best baseline model and the best feature engineered model used 50 closest neighbors. For this analysis, the most effective k nearest neighbor models are those that consider more neighbors. Further tuning could increase the number of closest neighbors to find an optimal parameter value.</p>
+<p>Visualizations of the tuning parameters for each grid are shown in <a href="#appendix-tuning-parameter-visualizations">Appendix: Tuning Parameter Visualizations</a>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-mod-res" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;7: Accuracy of Each Model</caption>
+<colgroup>
+<col style="width: 27%">
+<col style="width: 27%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">model</th>
+<th style="text-align: left;">recipe</th>
+<th style="text-align: right;">accuracy</th>
+<th style="text-align: right;">std_err</th>
+<th style="text-align: left;">estimator</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">boosted tree</td>
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.8015406</td>
+<td style="text-align: right;">0.0024844</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">elastic net</td>
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.8004720</td>
+<td style="text-align: right;">0.0029489</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">random forest</td>
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.7997973</td>
+<td style="text-align: right;">0.0022263</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">elastic net</td>
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7997401</td>
+<td style="text-align: right;">0.0029099</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">boosted tree</td>
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7995715</td>
+<td style="text-align: right;">0.0024285</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">logistic</td>
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7985584</td>
+<td style="text-align: right;">0.0030045</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">random forest</td>
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7977724</td>
+<td style="text-align: right;">0.0017100</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">logistic</td>
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.7946202</td>
+<td style="text-align: right;">0.0028876</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">k nearest neighbor</td>
+<td style="text-align: left;">feature engineered</td>
+<td style="text-align: right;">0.7786399</td>
+<td style="text-align: right;">0.0029346</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">k nearest neighbor</td>
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7725064</td>
+<td style="text-align: right;">0.0031037</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">naive Bayes</td>
+<td style="text-align: left;">baseline</td>
+<td style="text-align: right;">0.7654162</td>
+<td style="text-align: right;">0.0032768</td>
+<td style="text-align: left;">binary</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-mod-res">Table&nbsp;7</a> ranks all eleven of the models based on accuracy. It shows that the feature engineered boosted tree model was the most accurate, with an accuracy of .8015. In other words, when fit to the folds, this model correctly predicted whether a survey participant thought abortion should be legal or banned 80.15% of the time. It isn’t surprising that this was the best model, as the boosted tree model is the most complex of each of the models and the feature engineered recipe is the more complex recipe. However, this model wasn’t better than the less complex models by a large margin, which does come as a surprise.</p>
+</section>
+<section id="final-model-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="final-model-analysis">Final Model Analysis</h2>
+<p>I fit the feature engineered boosted tree model to the testing data.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-perf" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;8: Performance Metrics of Final Model</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">metric</th>
+<th style="text-align: right;">estimate</th>
+<th style="text-align: left;">estimator</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">accuracy</td>
+<td style="text-align: right;">0.8147773</td>
+<td style="text-align: left;">binary</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">roc_auc</td>
+<td style="text-align: right;">0.8873111</td>
+<td style="text-align: left;">binary</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/tbl-perf-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>As <a href="#tbl-perf">Table&nbsp;8</a> shows, the final model has an accuracy of .8148. In other words, the model correctly predicted support for abortion 81.48% of the time.</p>
+<p>I also computed the area under the receiver operating characteristic curve (ROC AUC) as another accuracy metric for the final model. This area measures the true positive rate and ranges from 0 to 1, where 0 indicates that no predicted positives are actually positive, .50 indicates that half of predicted positives are actually positive (what would be obtained from random guessing), and 1 indicates that all predicted positives are actually positive, and that the model generated perfect predictions. The final model has a ROC AUC of .8873, indicating that 88.73% of the predicted positives are true positives.</p>
+<p>I also created a confusion matrix to count the true positives, true negatives, false positives, and false negatives.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Truth
+Prediction banned legal
+    banned    479   148
+    legal     218  1131</code></pre>
+</div>
+</div>
+<p>The confusion matrix shows that:</p>
+<ul>
+<li><p>479 participants were predicted to select and did select “banned”</p></li>
+<li><p>1131 participants were predicted to select and did select “legal”</p></li>
+<li><p>218 participants were predicted to select “legal” but selected “banned”</p></li>
+<li><p>148 participants were predicted to select “banned” but selected “legal”</p></li>
+</ul>
+<p>The matrix shows that the model’s predictions were generally accurate when participants selected “legal,” but were inaccurate almost a third of the time when participants selected “banned.”</p>
+<p>While this model is good, the effort of building a predictive model might not necessarily pay off in this case. When the models were fitted to the folds, the accuracy of the feature engineered boosted tree model was less than .04 higher than that of the naive Bayes model (the simplest &amp; worst-performing model), less than .03 higher than that of the k nearest neighbor models, and less than .01 higher than that of all of the other models. There really isn’t a huge difference in the predictive power of the various models. It doesn’t seem that this model has any particular features that make it better than the others, although boosted tree is the most complex model type used.</p>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>Since all of the models had similar accuracy values, it seems that model type and number of parameters doesn’t have a huge influence on the predictions. It’s likely based on this analysis that there are a few predictor variables that are strong predictors for abortion views, while there are many predictors which don’t provide a great deal more insight. In addition, similarities between some of the predictors, such as the similarities between political party and political spectrum, could render some of the predictors redundant. Overall, this model does predict whether Americans support abortion with high accuracy, and simpler versions of the model also result in accurate predictions.</p>
+<p>There are several next steps that could be taken. A more complex multinomial classification could be performed to uncover the distinctions between those who think abortion should be legal in all cases and those who only think it should be legal with proven need, and between those who think abortion should be banned in all cases and those who think exceptions should be provided. A different model could also take fewer, more, or different variables into account to determine which are most important in predicting support for abortion. Finally, threshold tuning could be performed to account for the class imbalance.</p>
+</section>
+<section id="appendix-list-of-variables" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-list-of-variables">Appendix: List of Variables</h2>
+<p>This is a complete list of the 30 predictor variables I used. The variables’ descriptions are abbreviated when referenced in the report for increased clarity.</p>
+<p><strong>Categorical Variables:</strong></p>
+<ul>
+<li><p>“anger”: how angry participant was regarding the US</p></li>
+<li><p>“education”: highest level of education completed by participant</p></li>
+<li><p>“gender”: participant’s gender</p></li>
+<li><p>“gun ownership”: whether or not participant owned guns</p></li>
+<li><p>“happiness”: how happy participant was regarding the US</p></li>
+<li><p>“importance of checks and balances”: importance of checks and balances in the federal government to participant</p></li>
+<li><p>“importance of religion”: importance of religion to participant</p></li>
+<li><p>“level of political attention”: level of attention participant paid to politics</p></li>
+<li><p>“political party”: which political party participant identified as belonging to</p></li>
+<li><p>“political spectrum”: where participant placed themselves on spectrum from liberal to conservative</p></li>
+<li><p>“presidential vote”: who participant intended to vote for in the 2020 presidential election</p></li>
+<li><p>“race”: participant’s race or ethnicity</p></li>
+<li><p>“religion”: participant’s religion</p></li>
+<li><p>“right track”: whether participant believed the US is on the right track</p></li>
+<li><p>“sexual orientation”: participant’s sexual orientation</p></li>
+<li><p>“support for birthright citizenship”: whether participant supported birthright citizenship</p></li>
+<li><p>“support for climate action”: whether participant believed more or less action should be taken to combat climate change</p></li>
+<li><p>“support for the death penalty”: whether participant supported the death penalty</p></li>
+<li><p>“support for gay marriage”: participant’s view on gay marriage</p></li>
+<li><p>“support for impeachment”: whether participant believed Donald Trump should be impeached</p></li>
+<li><p>“support for parental leave”: whether participant supported paid parental leave</p></li>
+<li><p>“support for trans rights”: whether the participant believed transgender people should be allowed to use the bathroom of their identified gender</p></li>
+<li><p>“trust of media”: how much participant trusted the media</p></li>
+<li><p>“worry”: how worried participant was regarding the US</p></li>
+</ul>
+<p><strong>Numerical Variables:</strong></p>
+<ul>
+<li><p>“age”: participant’s age</p></li>
+<li><p>“Democratic approval”: how much participant approved of the Democratic Party</p></li>
+<li><p>“income”: participant’s yearly income</p></li>
+<li><p>“Republican approval”: how much participant approved of the Republican Party</p></li>
+<li><p>“support for guaranteed income”: how much participant supported government-provided guaranteed income</p></li>
+<li><p>“support for universal health insurance”: how much participant supported universal or government-provided health insurance</p></li>
+</ul>
+</section>
+<section id="appendix-eda2" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-eda2">Appendix: EDA<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></h2>
+<section id="distributions-of-categorical-variables" class="level4">
+<h4 class="anchored" data-anchor-id="distributions-of-categorical-variables">Distributions of Categorical Variables</h4>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-6.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-7.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-8.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-9.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-10.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-11.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-12.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-13.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-14.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-15.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-16.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-17.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-18.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-19.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-20.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-11-21.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-12-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-12-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-12-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-12-5.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>A positive association is shown between worry and anger, where worried people tend to be more angry. A negative association is shown between worry and happiness, where worried people tend to be less happy and happy people tend to be less worried. Therefore I removed happiness and anger from the feature engineered recipes since the three variables measure similar attributes and have similar trends.</p>
+</section>
+<section id="distributions-of-numerical-variables" class="level4">
+<h4 class="anchored" data-anchor-id="distributions-of-numerical-variables">Distributions of Numerical Variables</h4>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Age doesn’t benefit from any transformations.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-14-2.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The distribution of the square root of income is closer to normal than the distribution of income.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-15-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-15-3.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Democrat approval and Republican approval don’t benefit from any transformations. Plotting them against each other shows a negative relationship. The correlation value is found in <a href="#appendix-correlation-cramers-v-analysis">Appendix: Correlation &amp; Cramer’s V Analysis</a>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-16-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-16-3.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Support for universal health insurance and support for guaranteed income don’t benefit from any transformations. Plotting them against each other shows a positive relationship. The correlation value is found in <a href="#appendix-correlation-cramers-v-analysis">Appendix: Correlation &amp; Cramer’s V Analysis</a>.</p>
+</section>
+</section>
+<section id="appendix-correlation-cramers-v-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-correlation-cramers-v-analysis">Appendix: Correlation &amp; Cramer’s V Analysis</h2>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-cor" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;9: Correlation Between Numerical Predictor Variables</caption>
+<colgroup>
+<col style="width: 18%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 18%">
+<col style="width: 15%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">age</th>
+<th style="text-align: right;">income</th>
+<th style="text-align: right;">democratic</th>
+<th style="text-align: right;">republican</th>
+<th style="text-align: right;">health_insurance</th>
+<th style="text-align: right;">guaran_income</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">age</td>
+<td style="text-align: right;">1.0000000</td>
+<td style="text-align: right;">-0.0485316</td>
+<td style="text-align: right;">-0.0365974</td>
+<td style="text-align: right;">0.1001247</td>
+<td style="text-align: right;">0.1562418</td>
+<td style="text-align: right;">0.1377111</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">income</td>
+<td style="text-align: right;">-0.0485316</td>
+<td style="text-align: right;">1.0000000</td>
+<td style="text-align: right;">-0.0229140</td>
+<td style="text-align: right;">-0.0606937</td>
+<td style="text-align: right;">0.0457557</td>
+<td style="text-align: right;">0.0605350</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">democratic</td>
+<td style="text-align: right;">-0.0365974</td>
+<td style="text-align: right;">-0.0229140</td>
+<td style="text-align: right;">1.0000000</td>
+<td style="text-align: right;">-0.6808183</td>
+<td style="text-align: right;">-0.5433908</td>
+<td style="text-align: right;">-0.5574760</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">republican</td>
+<td style="text-align: right;">0.1001247</td>
+<td style="text-align: right;">-0.0606937</td>
+<td style="text-align: right;">-0.6808183</td>
+<td style="text-align: right;">1.0000000</td>
+<td style="text-align: right;">0.5705141</td>
+<td style="text-align: right;">0.5438839</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">health_insurance</td>
+<td style="text-align: right;">0.1562418</td>
+<td style="text-align: right;">0.0457557</td>
+<td style="text-align: right;">-0.5433908</td>
+<td style="text-align: right;">0.5705141</td>
+<td style="text-align: right;">1.0000000</td>
+<td style="text-align: right;">0.6195319</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">guaran_income</td>
+<td style="text-align: right;">0.1377111</td>
+<td style="text-align: right;">0.0605350</td>
+<td style="text-align: right;">-0.5574760</td>
+<td style="text-align: right;">0.5438839</td>
+<td style="text-align: right;">0.6195319</td>
+<td style="text-align: right;">1.0000000</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-cor">Table&nbsp;9</a> shows the correlation between each of the numerical predictors for abortion support.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div id="tbl-cv" class="anchored">
+<table class="table table-sm table-striped small">
+<caption>Table&nbsp;10: Correlation Between Categorical Predictor Variables</caption>
+<colgroup>
+<col style="width: 5%">
+<col style="width: 3%">
+<col style="width: 5%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 4%">
+<col style="width: 5%">
+<col style="width: 3%">
+<col style="width: 4%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 4%">
+<col style="width: 3%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 5%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 4%">
+<col style="width: 4%">
+<col style="width: 3%">
+<col style="width: 3%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">sex</th>
+<th style="text-align: right;">sexual_orientation</th>
+<th style="text-align: right;">race</th>
+<th style="text-align: right;">education</th>
+<th style="text-align: right;">gay_marriage</th>
+<th style="text-align: right;">religion_import</th>
+<th style="text-align: right;">religion</th>
+<th style="text-align: right;">politic_attent</th>
+<th style="text-align: right;">right_track</th>
+<th style="text-align: right;">angry</th>
+<th style="text-align: right;">happy</th>
+<th style="text-align: right;">worried</th>
+<th style="text-align: right;">president</th>
+<th style="text-align: right;">politic_scale</th>
+<th style="text-align: right;">party</th>
+<th style="text-align: right;">death_penalty</th>
+<th style="text-align: right;">trans_bathroom</th>
+<th style="text-align: right;">checks_balances</th>
+<th style="text-align: right;">trust_media</th>
+<th style="text-align: right;">impeachment</th>
+<th style="text-align: right;">climate_action</th>
+<th style="text-align: right;">parental_leave</th>
+<th style="text-align: right;">birthright</th>
+<th style="text-align: right;">guns</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">sex</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.0757572</td>
+<td style="text-align: right;">0.0726567</td>
+<td style="text-align: right;">0.0818789</td>
+<td style="text-align: right;">0.0680307</td>
+<td style="text-align: right;">0.0828900</td>
+<td style="text-align: right;">0.1183810</td>
+<td style="text-align: right;">0.1387636</td>
+<td style="text-align: right;">0.0608342</td>
+<td style="text-align: right;">0.0770460</td>
+<td style="text-align: right;">0.0708157</td>
+<td style="text-align: right;">0.1123924</td>
+<td style="text-align: right;">0.0856690</td>
+<td style="text-align: right;">0.1210295</td>
+<td style="text-align: right;">0.1174180</td>
+<td style="text-align: right;">0.0708383</td>
+<td style="text-align: right;">0.0937838</td>
+<td style="text-align: right;">0.0682049</td>
+<td style="text-align: right;">0.0580816</td>
+<td style="text-align: right;">0.0811753</td>
+<td style="text-align: right;">0.0684055</td>
+<td style="text-align: right;">0.1110670</td>
+<td style="text-align: right;">0.0847572</td>
+<td style="text-align: right;">0.1328729</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">sexual_orientation</td>
+<td style="text-align: right;">0.0757572</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.0484375</td>
+<td style="text-align: right;">0.0666682</td>
+<td style="text-align: right;">0.0983902</td>
+<td style="text-align: right;">0.0886322</td>
+<td style="text-align: right;">0.1080797</td>
+<td style="text-align: right;">0.0338957</td>
+<td style="text-align: right;">0.0840382</td>
+<td style="text-align: right;">0.0591839</td>
+<td style="text-align: right;">0.0599345</td>
+<td style="text-align: right;">0.0611071</td>
+<td style="text-align: right;">0.1084993</td>
+<td style="text-align: right;">0.1318762</td>
+<td style="text-align: right;">0.0880780</td>
+<td style="text-align: right;">0.0989446</td>
+<td style="text-align: right;">0.1737483</td>
+<td style="text-align: right;">0.0312010</td>
+<td style="text-align: right;">0.0502911</td>
+<td style="text-align: right;">0.1029354</td>
+<td style="text-align: right;">0.0769066</td>
+<td style="text-align: right;">0.0526025</td>
+<td style="text-align: right;">0.0627974</td>
+<td style="text-align: right;">0.0689207</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">race</td>
+<td style="text-align: right;">0.0726567</td>
+<td style="text-align: right;">0.0484375</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.0807501</td>
+<td style="text-align: right;">0.0567788</td>
+<td style="text-align: right;">0.0819253</td>
+<td style="text-align: right;">0.2086663</td>
+<td style="text-align: right;">0.0658713</td>
+<td style="text-align: right;">0.1596491</td>
+<td style="text-align: right;">0.0535897</td>
+<td style="text-align: right;">0.0808387</td>
+<td style="text-align: right;">0.0536372</td>
+<td style="text-align: right;">0.1325545</td>
+<td style="text-align: right;">0.0885787</td>
+<td style="text-align: right;">0.1675805</td>
+<td style="text-align: right;">0.1211383</td>
+<td style="text-align: right;">0.0329178</td>
+<td style="text-align: right;">0.0753378</td>
+<td style="text-align: right;">0.1026648</td>
+<td style="text-align: right;">0.1727024</td>
+<td style="text-align: right;">0.0765225</td>
+<td style="text-align: right;">0.0661212</td>
+<td style="text-align: right;">0.1013803</td>
+<td style="text-align: right;">0.1476576</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">education</td>
+<td style="text-align: right;">0.0818789</td>
+<td style="text-align: right;">0.0666682</td>
+<td style="text-align: right;">0.0807501</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.1060475</td>
+<td style="text-align: right;">0.0702317</td>
+<td style="text-align: right;">0.0964491</td>
+<td style="text-align: right;">0.0995479</td>
+<td style="text-align: right;">0.1184623</td>
+<td style="text-align: right;">0.0550144</td>
+<td style="text-align: right;">0.0568428</td>
+<td style="text-align: right;">0.0631313</td>
+<td style="text-align: right;">0.0961145</td>
+<td style="text-align: right;">0.0976600</td>
+<td style="text-align: right;">0.0759869</td>
+<td style="text-align: right;">0.1988882</td>
+<td style="text-align: right;">0.1628647</td>
+<td style="text-align: right;">0.1456429</td>
+<td style="text-align: right;">0.0762046</td>
+<td style="text-align: right;">0.1390509</td>
+<td style="text-align: right;">0.1267815</td>
+<td style="text-align: right;">0.0774377</td>
+<td style="text-align: right;">0.1094404</td>
+<td style="text-align: right;">0.0724711</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">gay_marriage</td>
+<td style="text-align: right;">0.0680307</td>
+<td style="text-align: right;">0.0983902</td>
+<td style="text-align: right;">0.0567788</td>
+<td style="text-align: right;">0.1060475</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.3171314</td>
+<td style="text-align: right;">0.2292507</td>
+<td style="text-align: right;">0.0432064</td>
+<td style="text-align: right;">0.2509414</td>
+<td style="text-align: right;">0.1226047</td>
+<td style="text-align: right;">0.1792785</td>
+<td style="text-align: right;">0.1553159</td>
+<td style="text-align: right;">0.2884971</td>
+<td style="text-align: right;">0.3586352</td>
+<td style="text-align: right;">0.2313557</td>
+<td style="text-align: right;">0.1509080</td>
+<td style="text-align: right;">0.4538815</td>
+<td style="text-align: right;">0.1019172</td>
+<td style="text-align: right;">0.1775241</td>
+<td style="text-align: right;">0.2635120</td>
+<td style="text-align: right;">0.2762984</td>
+<td style="text-align: right;">0.1612543</td>
+<td style="text-align: right;">0.1641433</td>
+<td style="text-align: right;">0.1124703</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">religion_import</td>
+<td style="text-align: right;">0.0828900</td>
+<td style="text-align: right;">0.0886322</td>
+<td style="text-align: right;">0.0819253</td>
+<td style="text-align: right;">0.0702317</td>
+<td style="text-align: right;">0.3171314</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.3466929</td>
+<td style="text-align: right;">0.0452569</td>
+<td style="text-align: right;">0.1984253</td>
+<td style="text-align: right;">0.0756849</td>
+<td style="text-align: right;">0.1121357</td>
+<td style="text-align: right;">0.0777826</td>
+<td style="text-align: right;">0.1563633</td>
+<td style="text-align: right;">0.2339857</td>
+<td style="text-align: right;">0.1567917</td>
+<td style="text-align: right;">0.1089071</td>
+<td style="text-align: right;">0.3282933</td>
+<td style="text-align: right;">0.0795166</td>
+<td style="text-align: right;">0.0913507</td>
+<td style="text-align: right;">0.1982330</td>
+<td style="text-align: right;">0.1951165</td>
+<td style="text-align: right;">0.0547402</td>
+<td style="text-align: right;">0.1041401</td>
+<td style="text-align: right;">0.0794475</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">religion</td>
+<td style="text-align: right;">0.1183810</td>
+<td style="text-align: right;">0.1080797</td>
+<td style="text-align: right;">0.2086663</td>
+<td style="text-align: right;">0.0964491</td>
+<td style="text-align: right;">0.2292507</td>
+<td style="text-align: right;">0.3466929</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.0883505</td>
+<td style="text-align: right;">0.1944139</td>
+<td style="text-align: right;">0.0929332</td>
+<td style="text-align: right;">0.1098103</td>
+<td style="text-align: right;">0.0913278</td>
+<td style="text-align: right;">0.1495000</td>
+<td style="text-align: right;">0.1815290</td>
+<td style="text-align: right;">0.1786406</td>
+<td style="text-align: right;">0.1654294</td>
+<td style="text-align: right;">0.2628297</td>
+<td style="text-align: right;">0.1028228</td>
+<td style="text-align: right;">0.0991884</td>
+<td style="text-align: right;">0.2125158</td>
+<td style="text-align: right;">0.1662010</td>
+<td style="text-align: right;">0.0925446</td>
+<td style="text-align: right;">0.1269233</td>
+<td style="text-align: right;">0.1588418</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">politic_attent</td>
+<td style="text-align: right;">0.1387636</td>
+<td style="text-align: right;">0.0338957</td>
+<td style="text-align: right;">0.0658713</td>
+<td style="text-align: right;">0.0995479</td>
+<td style="text-align: right;">0.0432064</td>
+<td style="text-align: right;">0.0452569</td>
+<td style="text-align: right;">0.0883505</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.0144548</td>
+<td style="text-align: right;">0.1247009</td>
+<td style="text-align: right;">0.0787713</td>
+<td style="text-align: right;">0.1109158</td>
+<td style="text-align: right;">0.0623257</td>
+<td style="text-align: right;">0.1237552</td>
+<td style="text-align: right;">0.0709756</td>
+<td style="text-align: right;">0.0742354</td>
+<td style="text-align: right;">0.0436381</td>
+<td style="text-align: right;">0.1207161</td>
+<td style="text-align: right;">0.1205955</td>
+<td style="text-align: right;">0.1610163</td>
+<td style="text-align: right;">0.0685344</td>
+<td style="text-align: right;">0.0551654</td>
+<td style="text-align: right;">0.1183078</td>
+<td style="text-align: right;">0.0571780</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">right_track</td>
+<td style="text-align: right;">0.0608342</td>
+<td style="text-align: right;">0.0840382</td>
+<td style="text-align: right;">0.1596491</td>
+<td style="text-align: right;">0.1184623</td>
+<td style="text-align: right;">0.2509414</td>
+<td style="text-align: right;">0.1984253</td>
+<td style="text-align: right;">0.1944139</td>
+<td style="text-align: right;">0.0144548</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.3861181</td>
+<td style="text-align: right;">0.5958906</td>
+<td style="text-align: right;">0.4664608</td>
+<td style="text-align: right;">0.6157956</td>
+<td style="text-align: right;">0.4929160</td>
+<td style="text-align: right;">0.4933770</td>
+<td style="text-align: right;">0.2686860</td>
+<td style="text-align: right;">0.3259800</td>
+<td style="text-align: right;">0.1405325</td>
+<td style="text-align: right;">0.3459046</td>
+<td style="text-align: right;">0.5369586</td>
+<td style="text-align: right;">0.4522211</td>
+<td style="text-align: right;">0.1678834</td>
+<td style="text-align: right;">0.2814387</td>
+<td style="text-align: right;">0.1611453</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">angry</td>
+<td style="text-align: right;">0.0770460</td>
+<td style="text-align: right;">0.0591839</td>
+<td style="text-align: right;">0.0535897</td>
+<td style="text-align: right;">0.0550144</td>
+<td style="text-align: right;">0.1226047</td>
+<td style="text-align: right;">0.0756849</td>
+<td style="text-align: right;">0.0929332</td>
+<td style="text-align: right;">0.1247009</td>
+<td style="text-align: right;">0.3861181</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.2794209</td>
+<td style="text-align: right;">0.4327649</td>
+<td style="text-align: right;">0.1897068</td>
+<td style="text-align: right;">0.2025833</td>
+<td style="text-align: right;">0.1994751</td>
+<td style="text-align: right;">0.1805745</td>
+<td style="text-align: right;">0.2102092</td>
+<td style="text-align: right;">0.1146940</td>
+<td style="text-align: right;">0.1359787</td>
+<td style="text-align: right;">0.2811897</td>
+<td style="text-align: right;">0.2300592</td>
+<td style="text-align: right;">0.1014560</td>
+<td style="text-align: right;">0.1694907</td>
+<td style="text-align: right;">0.0918877</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">happy</td>
+<td style="text-align: right;">0.0708157</td>
+<td style="text-align: right;">0.0599345</td>
+<td style="text-align: right;">0.0808387</td>
+<td style="text-align: right;">0.0568428</td>
+<td style="text-align: right;">0.1792785</td>
+<td style="text-align: right;">0.1121357</td>
+<td style="text-align: right;">0.1098103</td>
+<td style="text-align: right;">0.0787713</td>
+<td style="text-align: right;">0.5958906</td>
+<td style="text-align: right;">0.2794209</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.3171619</td>
+<td style="text-align: right;">0.2651032</td>
+<td style="text-align: right;">0.2472461</td>
+<td style="text-align: right;">0.2618053</td>
+<td style="text-align: right;">0.2325287</td>
+<td style="text-align: right;">0.2793157</td>
+<td style="text-align: right;">0.0914981</td>
+<td style="text-align: right;">0.1676247</td>
+<td style="text-align: right;">0.3525526</td>
+<td style="text-align: right;">0.2957737</td>
+<td style="text-align: right;">0.1242710</td>
+<td style="text-align: right;">0.1920004</td>
+<td style="text-align: right;">0.1344538</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">worried</td>
+<td style="text-align: right;">0.1123924</td>
+<td style="text-align: right;">0.0611071</td>
+<td style="text-align: right;">0.0536372</td>
+<td style="text-align: right;">0.0631313</td>
+<td style="text-align: right;">0.1553159</td>
+<td style="text-align: right;">0.0777826</td>
+<td style="text-align: right;">0.0913278</td>
+<td style="text-align: right;">0.1109158</td>
+<td style="text-align: right;">0.4664608</td>
+<td style="text-align: right;">0.4327649</td>
+<td style="text-align: right;">0.3171619</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.2277700</td>
+<td style="text-align: right;">0.2210657</td>
+<td style="text-align: right;">0.2322094</td>
+<td style="text-align: right;">0.2209341</td>
+<td style="text-align: right;">0.2673545</td>
+<td style="text-align: right;">0.1234687</td>
+<td style="text-align: right;">0.1671570</td>
+<td style="text-align: right;">0.3169060</td>
+<td style="text-align: right;">0.2663066</td>
+<td style="text-align: right;">0.1184255</td>
+<td style="text-align: right;">0.1913238</td>
+<td style="text-align: right;">0.1278908</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">president</td>
+<td style="text-align: right;">0.0856690</td>
+<td style="text-align: right;">0.1084993</td>
+<td style="text-align: right;">0.1325545</td>
+<td style="text-align: right;">0.0961145</td>
+<td style="text-align: right;">0.2884971</td>
+<td style="text-align: right;">0.1563633</td>
+<td style="text-align: right;">0.1495000</td>
+<td style="text-align: right;">0.0623257</td>
+<td style="text-align: right;">0.6157956</td>
+<td style="text-align: right;">0.1897068</td>
+<td style="text-align: right;">0.2651032</td>
+<td style="text-align: right;">0.2277700</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.3824433</td>
+<td style="text-align: right;">0.4486087</td>
+<td style="text-align: right;">0.4008787</td>
+<td style="text-align: right;">0.5248196</td>
+<td style="text-align: right;">0.1001628</td>
+<td style="text-align: right;">0.3201932</td>
+<td style="text-align: right;">0.5958619</td>
+<td style="text-align: right;">0.4705775</td>
+<td style="text-align: right;">0.2073302</td>
+<td style="text-align: right;">0.3163892</td>
+<td style="text-align: right;">0.2576247</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">politic_scale</td>
+<td style="text-align: right;">0.1210295</td>
+<td style="text-align: right;">0.1318762</td>
+<td style="text-align: right;">0.0885787</td>
+<td style="text-align: right;">0.0976600</td>
+<td style="text-align: right;">0.3586352</td>
+<td style="text-align: right;">0.2339857</td>
+<td style="text-align: right;">0.1815290</td>
+<td style="text-align: right;">0.1237552</td>
+<td style="text-align: right;">0.4929160</td>
+<td style="text-align: right;">0.2025833</td>
+<td style="text-align: right;">0.2472461</td>
+<td style="text-align: right;">0.2210657</td>
+<td style="text-align: right;">0.3824433</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.4500091</td>
+<td style="text-align: right;">0.4341640</td>
+<td style="text-align: right;">0.5600414</td>
+<td style="text-align: right;">0.1078458</td>
+<td style="text-align: right;">0.2906606</td>
+<td style="text-align: right;">0.5147861</td>
+<td style="text-align: right;">0.4444499</td>
+<td style="text-align: right;">0.2215143</td>
+<td style="text-align: right;">0.3172478</td>
+<td style="text-align: right;">0.2552373</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">party</td>
+<td style="text-align: right;">0.1174180</td>
+<td style="text-align: right;">0.0880780</td>
+<td style="text-align: right;">0.1675805</td>
+<td style="text-align: right;">0.0759869</td>
+<td style="text-align: right;">0.2313557</td>
+<td style="text-align: right;">0.1567917</td>
+<td style="text-align: right;">0.1786406</td>
+<td style="text-align: right;">0.0709756</td>
+<td style="text-align: right;">0.4933770</td>
+<td style="text-align: right;">0.1994751</td>
+<td style="text-align: right;">0.2618053</td>
+<td style="text-align: right;">0.2322094</td>
+<td style="text-align: right;">0.4486087</td>
+<td style="text-align: right;">0.4500091</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.3577796</td>
+<td style="text-align: right;">0.4150941</td>
+<td style="text-align: right;">0.0825128</td>
+<td style="text-align: right;">0.3031287</td>
+<td style="text-align: right;">0.4841090</td>
+<td style="text-align: right;">0.3719152</td>
+<td style="text-align: right;">0.1705455</td>
+<td style="text-align: right;">0.2730623</td>
+<td style="text-align: right;">0.2319901</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">death_penalty</td>
+<td style="text-align: right;">0.0708383</td>
+<td style="text-align: right;">0.0989446</td>
+<td style="text-align: right;">0.1211383</td>
+<td style="text-align: right;">0.1988882</td>
+<td style="text-align: right;">0.1509080</td>
+<td style="text-align: right;">0.1089071</td>
+<td style="text-align: right;">0.1654294</td>
+<td style="text-align: right;">0.0742354</td>
+<td style="text-align: right;">0.2686860</td>
+<td style="text-align: right;">0.1805745</td>
+<td style="text-align: right;">0.2325287</td>
+<td style="text-align: right;">0.2209341</td>
+<td style="text-align: right;">0.4008787</td>
+<td style="text-align: right;">0.4341640</td>
+<td style="text-align: right;">0.3577796</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.2946647</td>
+<td style="text-align: right;">0.1585867</td>
+<td style="text-align: right;">0.2879917</td>
+<td style="text-align: right;">0.3648782</td>
+<td style="text-align: right;">0.3094031</td>
+<td style="text-align: right;">0.1595215</td>
+<td style="text-align: right;">0.3109608</td>
+<td style="text-align: right;">0.1990570</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">trans_bathroom</td>
+<td style="text-align: right;">0.0937838</td>
+<td style="text-align: right;">0.1737483</td>
+<td style="text-align: right;">0.0329178</td>
+<td style="text-align: right;">0.1628647</td>
+<td style="text-align: right;">0.4538815</td>
+<td style="text-align: right;">0.3282933</td>
+<td style="text-align: right;">0.2628297</td>
+<td style="text-align: right;">0.0436381</td>
+<td style="text-align: right;">0.3259800</td>
+<td style="text-align: right;">0.2102092</td>
+<td style="text-align: right;">0.2793157</td>
+<td style="text-align: right;">0.2673545</td>
+<td style="text-align: right;">0.5248196</td>
+<td style="text-align: right;">0.5600414</td>
+<td style="text-align: right;">0.4150941</td>
+<td style="text-align: right;">0.2946647</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.1265742</td>
+<td style="text-align: right;">0.4001698</td>
+<td style="text-align: right;">0.4836830</td>
+<td style="text-align: right;">0.4341132</td>
+<td style="text-align: right;">0.2039379</td>
+<td style="text-align: right;">0.3135769</td>
+<td style="text-align: right;">0.2037753</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">checks_balances</td>
+<td style="text-align: right;">0.0682049</td>
+<td style="text-align: right;">0.0312010</td>
+<td style="text-align: right;">0.0753378</td>
+<td style="text-align: right;">0.1456429</td>
+<td style="text-align: right;">0.1019172</td>
+<td style="text-align: right;">0.0795166</td>
+<td style="text-align: right;">0.1028228</td>
+<td style="text-align: right;">0.1207161</td>
+<td style="text-align: right;">0.1405325</td>
+<td style="text-align: right;">0.1146940</td>
+<td style="text-align: right;">0.0914981</td>
+<td style="text-align: right;">0.1234687</td>
+<td style="text-align: right;">0.1001628</td>
+<td style="text-align: right;">0.1078458</td>
+<td style="text-align: right;">0.0825128</td>
+<td style="text-align: right;">0.1585867</td>
+<td style="text-align: right;">0.1265742</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.0952557</td>
+<td style="text-align: right;">0.2056667</td>
+<td style="text-align: right;">0.1623817</td>
+<td style="text-align: right;">0.0949420</td>
+<td style="text-align: right;">0.1501544</td>
+<td style="text-align: right;">0.0428579</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">trust_media</td>
+<td style="text-align: right;">0.0580816</td>
+<td style="text-align: right;">0.0502911</td>
+<td style="text-align: right;">0.1026648</td>
+<td style="text-align: right;">0.0762046</td>
+<td style="text-align: right;">0.1775241</td>
+<td style="text-align: right;">0.0913507</td>
+<td style="text-align: right;">0.0991884</td>
+<td style="text-align: right;">0.1205955</td>
+<td style="text-align: right;">0.3459046</td>
+<td style="text-align: right;">0.1359787</td>
+<td style="text-align: right;">0.1676247</td>
+<td style="text-align: right;">0.1671570</td>
+<td style="text-align: right;">0.3201932</td>
+<td style="text-align: right;">0.2906606</td>
+<td style="text-align: right;">0.3031287</td>
+<td style="text-align: right;">0.2879917</td>
+<td style="text-align: right;">0.4001698</td>
+<td style="text-align: right;">0.0952557</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.4201703</td>
+<td style="text-align: right;">0.3244397</td>
+<td style="text-align: right;">0.1288527</td>
+<td style="text-align: right;">0.2202662</td>
+<td style="text-align: right;">0.1897786</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">impeachment</td>
+<td style="text-align: right;">0.0811753</td>
+<td style="text-align: right;">0.1029354</td>
+<td style="text-align: right;">0.1727024</td>
+<td style="text-align: right;">0.1390509</td>
+<td style="text-align: right;">0.2635120</td>
+<td style="text-align: right;">0.1982330</td>
+<td style="text-align: right;">0.2125158</td>
+<td style="text-align: right;">0.1610163</td>
+<td style="text-align: right;">0.5369586</td>
+<td style="text-align: right;">0.2811897</td>
+<td style="text-align: right;">0.3525526</td>
+<td style="text-align: right;">0.3169060</td>
+<td style="text-align: right;">0.5958619</td>
+<td style="text-align: right;">0.5147861</td>
+<td style="text-align: right;">0.4841090</td>
+<td style="text-align: right;">0.3648782</td>
+<td style="text-align: right;">0.4836830</td>
+<td style="text-align: right;">0.2056667</td>
+<td style="text-align: right;">0.4201703</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.4423099</td>
+<td style="text-align: right;">0.2160373</td>
+<td style="text-align: right;">0.3171672</td>
+<td style="text-align: right;">0.2246734</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">climate_action</td>
+<td style="text-align: right;">0.0684055</td>
+<td style="text-align: right;">0.0769066</td>
+<td style="text-align: right;">0.0765225</td>
+<td style="text-align: right;">0.1267815</td>
+<td style="text-align: right;">0.2762984</td>
+<td style="text-align: right;">0.1951165</td>
+<td style="text-align: right;">0.1662010</td>
+<td style="text-align: right;">0.0685344</td>
+<td style="text-align: right;">0.4522211</td>
+<td style="text-align: right;">0.2300592</td>
+<td style="text-align: right;">0.2957737</td>
+<td style="text-align: right;">0.2663066</td>
+<td style="text-align: right;">0.4705775</td>
+<td style="text-align: right;">0.4444499</td>
+<td style="text-align: right;">0.3719152</td>
+<td style="text-align: right;">0.3094031</td>
+<td style="text-align: right;">0.4341132</td>
+<td style="text-align: right;">0.1623817</td>
+<td style="text-align: right;">0.3244397</td>
+<td style="text-align: right;">0.4423099</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.2661779</td>
+<td style="text-align: right;">0.2619870</td>
+<td style="text-align: right;">0.1593263</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">parental_leave</td>
+<td style="text-align: right;">0.1110670</td>
+<td style="text-align: right;">0.0526025</td>
+<td style="text-align: right;">0.0661212</td>
+<td style="text-align: right;">0.0774377</td>
+<td style="text-align: right;">0.1612543</td>
+<td style="text-align: right;">0.0547402</td>
+<td style="text-align: right;">0.0925446</td>
+<td style="text-align: right;">0.0551654</td>
+<td style="text-align: right;">0.1678834</td>
+<td style="text-align: right;">0.1014560</td>
+<td style="text-align: right;">0.1242710</td>
+<td style="text-align: right;">0.1184255</td>
+<td style="text-align: right;">0.2073302</td>
+<td style="text-align: right;">0.2215143</td>
+<td style="text-align: right;">0.1705455</td>
+<td style="text-align: right;">0.1595215</td>
+<td style="text-align: right;">0.2039379</td>
+<td style="text-align: right;">0.0949420</td>
+<td style="text-align: right;">0.1288527</td>
+<td style="text-align: right;">0.2160373</td>
+<td style="text-align: right;">0.2661779</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.1729071</td>
+<td style="text-align: right;">0.1258612</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">birthright</td>
+<td style="text-align: right;">0.0847572</td>
+<td style="text-align: right;">0.0627974</td>
+<td style="text-align: right;">0.1013803</td>
+<td style="text-align: right;">0.1094404</td>
+<td style="text-align: right;">0.1641433</td>
+<td style="text-align: right;">0.1041401</td>
+<td style="text-align: right;">0.1269233</td>
+<td style="text-align: right;">0.1183078</td>
+<td style="text-align: right;">0.2814387</td>
+<td style="text-align: right;">0.1694907</td>
+<td style="text-align: right;">0.1920004</td>
+<td style="text-align: right;">0.1913238</td>
+<td style="text-align: right;">0.3163892</td>
+<td style="text-align: right;">0.3172478</td>
+<td style="text-align: right;">0.2730623</td>
+<td style="text-align: right;">0.3109608</td>
+<td style="text-align: right;">0.3135769</td>
+<td style="text-align: right;">0.1501544</td>
+<td style="text-align: right;">0.2202662</td>
+<td style="text-align: right;">0.3171672</td>
+<td style="text-align: right;">0.2619870</td>
+<td style="text-align: right;">0.1729071</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">0.1727592</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">guns</td>
+<td style="text-align: right;">0.1328729</td>
+<td style="text-align: right;">0.0689207</td>
+<td style="text-align: right;">0.1476576</td>
+<td style="text-align: right;">0.0724711</td>
+<td style="text-align: right;">0.1124703</td>
+<td style="text-align: right;">0.0794475</td>
+<td style="text-align: right;">0.1588418</td>
+<td style="text-align: right;">0.0571780</td>
+<td style="text-align: right;">0.1611453</td>
+<td style="text-align: right;">0.0918877</td>
+<td style="text-align: right;">0.1344538</td>
+<td style="text-align: right;">0.1278908</td>
+<td style="text-align: right;">0.2576247</td>
+<td style="text-align: right;">0.2552373</td>
+<td style="text-align: right;">0.2319901</td>
+<td style="text-align: right;">0.1990570</td>
+<td style="text-align: right;">0.2037753</td>
+<td style="text-align: right;">0.0428579</td>
+<td style="text-align: right;">0.1897786</td>
+<td style="text-align: right;">0.2246734</td>
+<td style="text-align: right;">0.1593263</td>
+<td style="text-align: right;">0.1258612</td>
+<td style="text-align: right;">0.1727592</td>
+<td style="text-align: right;">NA</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<p><a href="#tbl-cv">Table&nbsp;10</a> shows the correlation between each of the categorical predictors for abortion support.</p>
+</section>
+<section id="appendix-tuning-parameter-visualizations" class="level2">
+<h2 class="anchored" data-anchor-id="appendix-tuning-parameter-visualizations">Appendix: Tuning Parameter Visualizations</h2>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the elastic net model with the baseline recipe. Accuracy remains fairly constant until regularization is increased to .01, when it sharply drops.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the elastic net model with the feature engineered recipe. Similarly to the previous plot, accuracy drops sharply when regularization is increased to .01. The models with penalty of 0 are generally more accurate.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-21-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the random forest model with the baseline recipe. Overall accuracy remains fairly constant. Accuracy increases as the number of randomly selected predictors increases, but doesn’t have as strong a relationship to minimum node size.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-22-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the random forest model with the feature engineered recipe. Similarly to the previous plot, accuracy remains fairly constant overall. Accuracy generally increases as the number of randomly selected predictors increases and doesn’t have a clear relationship to minimum node size.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-23-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the boosted tree model with the baseline recipe. Accuracy generally increases as the number of randomly selected predictors increases, unless the learning rate is high, in which case fewer predictors can be better. Accuracy doesn’t have a clear relationship to minimum node size.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the boosted tree model with the feature engineered recipe. As with the previous plot, accuracy generally increases as the number of randomly selected predictors increases, unless the learning rate is high, in which case fewer predictors can be better. Accuracy doesn’t have a clear relationship to minimum node size.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-25-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the k nearest neighbor model with the baseline recipe. Accuracy increases as the number of nearest neighbors increases.</p>
+<div class="cell">
+<div class="cell-output-display">
+<p><img src="Nelson_Julia_final_report_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>This plot displays tuning parameters vs.&nbsp;accuracy for the k nearest neighbor model with the feature engineered recipe. As with the previous plot, accuracy increases as the number of nearest neighbors increases.</p>
+</section>
+
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>American National Election Studies. 2021. ANES 2020 Time Series Study Full Release. July 19, 2021 version. <a href="https://electionstudies.org/data-center/2020-time-series-study/" class="uri">https://electionstudies.org/data-center/2020-time-series-study/</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Note: I created more plots exploring the interactions between variables than are shown here. I only included the interaction plots that I used to create the feature engineered recipe.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

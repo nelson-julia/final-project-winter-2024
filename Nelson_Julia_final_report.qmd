@@ -1,0 +1,744 @@
+---
+title: "Predicting American Adults' Views on Abortion"
+subtitle: |
+  | Final Report
+  | Data Science 2 with R (STAT 301-2)
+author: "Julia Nelson"
+date: 3/13/2024
+format: html
+editor: visual
+---
+
+::: {.callout-tip icon="false"}
+## [Final Project GitHub](https://github.com/stat301-2-2024-winter/final-project-2-nelson-julia.git)
+:::
+
+```{r}
+#| echo: false
+#| message: false
+
+# load packages
+library(tidyverse)
+library(tidymodels)
+library(knitr)
+library(here)
+
+# load data
+load(here("data/dirty_data.rda"))
+load(here("splits/train.rda"))
+
+load(here("models/bt_base.rda"))
+load(here("models/bt_feat.rda"))
+load(here("models/elastic.rda"))
+load(here("models/knn_base.rda"))
+load(here("models/knn_feat.rda"))
+load(here("models/rf_base.rda"))
+load(here("models/rf_feat.rda"))
+
+load(here("results/metrics.rda"))
+load(here("results/best_params.rda"))
+load(here("results/performance.rda"))
+load(here("results/conf_mat.rda"))
+load(here("results/cor.rda"))
+load(here("results/cv.rda"))
+```
+
+## Introduction
+
+My objective is to predict whether American adults believe that abortion should be legal or banned based on their personal characteristics and political views. "Legal" indicates that a person believes abortion should be legal in all or most circumstances. "Banned" indicates that a person believes abortion should be illegal in all circumstances, or all circumstances excluding rape, incest, and when the mother's life is at stake. This is a classification problem.
+
+Abortion is an important political, social, and civil rights issue in the United States, especially since the overturning of *Roe v. Wade* in 2022. Abortion rights will likely be a major deciding factor in the outcome of the upcoming 2024 presidential election. Thus it is useful to know where Americans stand on abortion, and what factors influence their views. My model seeks to predict support for abortion based on known information.
+
+The dataset I will use to build a predictive model is the **American National Election Studies (ANES) 2020 Time Series Study**[^1]. ANES surveys American voters before and after each presidential election, collecting demographics, public opinion, and political participation. This survey took place before the 2020 presidential election.
+
+[^1]: American National Election Studies. 2021. ANES 2020 Time Series Study Full Release. July 19, 2021 version. <https://electionstudies.org/data-center/2020-time-series-study/>
+
+## Data Overview
+
+The dataset initially had 1000 variables and 8280 observations. As building a model with 999 predictor variables would be prohibitively difficult and time-consuming, I selected 30 variables to be predictors. 24 of these are categorical and the other 6 are numerical. I made sure to cover basic demographic information, such as age, gender, and income, as well as political identities and perspectives on various political and social issues. The full list of predictor variables is included in [Appendix: List of Variables].
+
+```{r}
+#| label: tbl-dirty # label table
+#| tbl-cap: "8280 American Adults' Views on Abortion" # name table
+#| echo: false
+
+dirty_data |>
+  mutate(abortion = as.factor(V201336)) |>
+  mutate(abortion = fct_recode(abortion, 
+                        "banned" = "1",
+                        "banned w/ exceptions" = "2",
+                        "legal w/ proven need" = "3",
+                        "legal" = "4",
+                        "NA/other/unsure" = "5",
+                        "NA/other/unsure" = "-8",
+                        "NA/other/unsure" = "-9")) -> scrub_data
+
+scrub_data |>
+  select(abortion) |>
+  group_by(abortion) |>
+  count(sort = TRUE) |>
+  kable()
+```
+
+The dataset initially included six unique potential responses that participants could choose from when asked about their views on abortion, as well as an 'NA' category for participants who didn't answer the question.
+
+@tbl-dirty shows that of the 8280 observations, 4017 survey participants believed abortion should always be legal, 1916 believed it should be banned with exceptions, 1097 believed it should be legal with proven need, and 870 thought it should be banned in all cases. In order to perform binary classification, I combined the "legal" and "legal with proven need" categories into one category for those who believe abortion should be legal in most circumstances. Likewise, I combined the "banned" and "banned with exceptions" categories into one category for those who believe abortion should be illegal in most circumstances.
+
+The other 380 participants were unsure about their view, had a view that wasn't included in the survey, or didn't answer the question. For simplicity, I combined them into one category in @tbl-dirty. I removed these 380 observations from the dataset since their views on abortion are unknown or can't be partitioned into "legal" and "banned."
+
+```{r}
+#| label: tbl-clean # label table
+#| tbl-cap: "7900 American Adults' Views on Abortion" # name table
+#| echo: false
+
+scrub_data |>
+  mutate(abortion = fct_recode(abortion, 
+                        "banned" = "banned w/ exceptions",
+                        "legal" = "legal w/ proven need")) |>
+  group_by(abortion) |>
+  filter(abortion == "banned" | abortion == "legal") |>
+  count(sort = TRUE) |>
+  kable()
+```
+
+@tbl-clean shows that under this consolidation, 7900 observations remained. 5114 participants believed abortion should generally be legal, and 2786 believed it should generally be banned. There is a class imbalance, with around 65% of participants in the "legal" category and the other 35% in the "banned" category.
+
+I performed an exploratory data analysis on the data to determine the distributions of each of the predictor vairables as well as their relationships to one another. The results of this EDA are included in [Appendix: EDA].
+
+## Methods
+
+As stated above, this is a classification problem. In addition, this model is predictive. As the dataset is derived from a random sample of Americans, it is representative of the US population as a whole. The model can be used to predict individual support for abortion, as well as the support of the broader population.
+
+#### Splitting Data
+
+The dataset was split using a 75/25 split. 75% of the data (5925 observations) was used to train the model and 25% of the data (1975 observations) was used to test the model. This ratio allows for both good predictive performance that can be generalized to the dataset and good assessment of model efficacy. I stratified the data by the outcome variable, abortion, in order to ensure similar proportions of each outcome represented in the testing and training data.
+
+#### Resampling
+
+I performed resampling before fitting any models directly to the training data. Under resampling, the training data was itself divided into training and testing categories. The training subset was used to fit the model, while the testing subset was used to evaluate the model. This was done multiple times, so that the efficacy of each model could be more accurately determined than if the model had only been fit once. This helps to improve model accuracy, as well as prevent overfitting, where the model is fit too closely to the training data and can't be applied to new data as well.
+
+The resampling method I used was V-fold cross-validation. The training data was randomly split into 5 folds of similar size (around 1185 observations each). I once again stratified the data by the outcome variable, abortion, so that similar proportions of each outcome were represented in each fold. A model was created using 4 of the 5 folds, and the remaining fold was used to test the model. This was done using each fold as the testing fold. The whole process was repeated 3 times, so a total of 15 models were trained and tested. The final performance metric averages the 15 replicates. Either 5 folds with 3 repetitions or 10 folds with 5 repetitions are commonly used, and I chose the former due to the large number of categorical predictors, which increased model complexity and the time required to fit each model.
+
+I chose V-fold cross-validation due to its advantages over other resampling methods. It isn't as time-consuming as leave-one-out cross-validation. Unlike Monte Carlo cross-validation, V-fold cross-validation creates mutually exclusive assessment sets.
+
+#### Types of Models
+
+I fit six different types of models to the folds: naive Bayes, logistic, elastic net, random forest, boosted tree, and k nearest neighbor.
+
+The naive Bayes model is a simple model that relies on probability and assumes that all predictors are independent of one another. My naive Bayes model serves as the baseline model, with which all other models will be compared to put their efficacy into context and determine if developing complex models was worthwhile. The naive Bayes model doesn't have any parameters. I trained one naive Bayes model 15 times, for a total of 15 trainings.
+
+The logistic model is a parametric model that calculates the probability that each observation will be in either outcome category, and assigns observations to either category based on that likelihood. This model doesn't have any parameters. I trained two logistic models 15 times, for a total of 30 trainings.
+
+The elastic net model is a parametric model that is a combination of two other models, the fused ridge and fused lasso models. It has two parameters: a penalty value that selects the most important features and prevents the model from being overfit, and a mixture value that determines what proportion of the model will be ridge and what proportion will be lasso. I tuned the penalty value to be explored over 5 levels from 10^-10^ to 1, and the mixture value to be explored over 5 levels from 0 to 1 (0% ridge to 100% ridge). I trained 50 elastic net models 15 times, for a total of 750 trainings.
+
+The random forest model is a tree-based model that progressively segments the training data into simpler regions, like the branches of a tree. The outcome category each observation is predicted to have is based on its position in the tree. The random forest model has three parameters: the number of predictors randomly sampled at each split, the number of trees to be averaged for the final prediction, and the minimum number of data points required for the tree to be split further. I set the number of trees to 500, since models with larger tree counts took a prohibitively long time to run. I tuned the number of predictors to be explored over 5 levels from 5 to 15, and the minimum number of data points to be explored over 5 levels from 5 to 20. I trained 50 random forest models 15 times, for a total of 750 trainings.
+
+The boosted tree model is a tree-based model that combine multiple sequential trees into a stronger model, where the newer trees are trained on the older trees. This model has four parameters: the same three as the random forest model, as well as the learning rate, which measures the level of influence of each new tree. A value of 0 indicates no influence, while 1 indicates a great deal of influence. As before, I set the number of trees to 500. I tuned the number of predictors to be explored over 5 levels from 1 to 5, and tuned the minimum number of data points to be explored over 5 levels from 5 to 40. I tuned the learning rate to be explored over 10 levels from 10^-5^ to 10^-.1^. I trained 500 boosted tree models 15 times, for a total of 7500 trainings.
+
+The k nearest neighbor model is a tree-based model which finds the "closest" (most similar) training data points to a new data point and predicts the value of the new data point based on those points. This model has one parameter, the number of closest data points, or neighbors, to be considered. I tuned the number of neighbors to be explored over 10 levels from 5 to 50. I trained 20 k nearest neighbor models 15 times, for a total of 300 trainings.
+
+#### Recipes
+
+I created four recipes in total: a baseline recipe for the parametric models, a baseline recipe for the tree-based models, a feature engineered recipe for the parametric models, and a feature engineered recipe for the tree-based models.
+
+Each model was first fit to a baseline recipe. This recipe contains only the basic steps required for a prediction to be produced. Missing values of categorical variables were imputed using that variable's mode. Missing values of numerical variables were imputed using that variable's mean. The categorical variables were transformed into numerical variables. All predictors with zero variance were removed, and all predictors were normalized. There is one difference between the baseline recipes for the parametric and tree-based models. The former split categorical variables with n categories into n-1 numerical variables, while the latter split categorical variables with n categories into n numerical variables.
+
+Each model was then fit to a feature engineered recipe, except for the naive Bayes model, which as the baseline model was only fit to the baseline recipe. As with the baseline recipe, all categorical variables were transformed into either n-1 (parametric) or n (tree-based) numerical variables, all predictors with zero variance were removed, and all predictors were normalized. Instead of using a variable's mean or mode, missing values of all variables were imputed based on the values of the 10 closest neighboring points. Additionally, the feature engineered recipe removed two variables, happiness and anger. These were very similar to another variable, worry, and only served to make the recipe more complex without adding any extra insight. The square root of income was taken in order to normalize this variable. Plots with the relationship between happiness and worry and anger and worry, as well as a plot of the square root of income, can be found in [Appendix: EDA].
+
+I also added interaction terms to the parametric feature engineered recipe to account for relationships between variables. I determined the correlation between each of the numerical variables. Correlation ranges from -1 to 1, with 1 indicating a perfect positive relationship, -1 indicating a perfect negative relationship, and 0 indicating no relationship between two variables. I chose to add interaction terms between variables with \|correlation\| \> .60. Thus I added interaction terms between:
+
+-   Democratic approval and Republican approval (cor = -0.68)
+
+-   support for guaranteed income and support for universal health insurance (cor = .62)
+
+I determined the Cramer's V between each of the categorical variables. Cramer's V ranges from 0 to 1, with 1 indicating a perfect relationship and 0 indicating no relationship between two variables. I chose to add interaction terms between variables with Cramer's V \> .50. Thus I added interaction terms between:
+
+-   right track and support for impeachment (CV = .54)
+
+-   presidential vote and support for impeachment (CV = .60)
+
+-   political spectrum and support for trans rights (CV = .56)
+
+-   political spectrum and support for impeachment (CV = .52)
+
+As a result, my parametric feature engineered recipe had a total of six interaction terms. The correlation and Cramer's V tables are included in [Appendix: Correlation & Cramer's V Analysis](#appendix-correlation-cramers-v-analysis).
+
+The metric I used to compare models is accuracy. Accuracy measures the percent of predictions which matched the actual values. An accuracy value of 1.00 (100%) indicates that the predicted value matched the actual value for every data point. In this case the model was perfectly accurate. An accuracy value of .50 (50%) indicates that the predicted values matched the actual value for half of the data points. In this case the model was no better than random guessing. The final/winning model is the one with the highest accuracy.
+
+## Model Building & Selection Results
+
+```{r}
+#| label: tbl-elastic # label table
+#| tbl-cap: "Best Tuning Parameters for Elastic Net Model" # name table
+#| echo: false
+
+elastic_metrics |> kable()
+```
+
+@tbl-elastic shows the best tuning parameters for the elastic net model. The best baseline model had a penalty of .00316 and a mixture of .25, while the best feature engineered model had a penalty of .00316 and a mixture of 1.00. It seems that the most effective elastic net models have a high penalty, while the mixture isn't particularly important. Further tuning could explore higher penalties with a variety of mixtures to find optimal parameter values.
+
+```{r}
+#| label: tbl-rf # label table
+#| tbl-cap: "Best Tuning Parameters for Random Forest Model" # name table
+#| echo: false
+
+rf_metrics |> kable()
+```
+
+@tbl-rf shows the best tuning parameters for the random forest model. The best baseline model had 15 predictors sampled at each split and a minimum of 5 data points for the tree to be split further. The best feature engineered model had 12 predictors sampled at each split and a minimum of 16 data points for the tree to be split further. It seems that the most effective random forest models have a high number of predictors sampled, while the minimum number of data points isn't as important. Further tuning could explore higher numbers of predictors with a variety of minimum numbers of data points to find optimal parameter values.
+
+```{r}
+#| label: tbl-bt # label table
+#| tbl-cap: "Best Tuning Parameters for Boosted Tree Model" # name table
+#| echo: false
+
+bt_metrics |> kable()
+```
+
+@tbl-bt shows the best tuning parameters for the boosted tree model. The best baseline model had 5 predictors sampled at each split, a minimum of 22 data points for the tree to be split further, and a learn rate of .0185. The best feature engineered model had 3 predictors sampled at each split, a minimum of 16 data points for the tree to be split further, and a learn rate of .0185. It seems that the most effective boosted tree models have a medium learn rate, while the number of predictors sampled and minimum data points aren't as important. Further tuning could set the number of predictors and explore a variety of numbers of predictors and minimum numbers of data points to find optimal parameter values.
+
+```{r}
+#| label: tbl-knn # label table
+#| tbl-cap: "Best Tuning Parameters for K Nearest Neighbor Model" # name table
+#| echo: false
+
+knn_metrics |> kable()
+```
+
+@tbl-knn shows the best tuning parameters for the k nearest neighbor model. Both the best baseline model and the best feature engineered model used 50 closest neighbors. For this analysis, the most effective k nearest neighbor models are those that consider more neighbors. Further tuning could increase the number of closest neighbors to find an optimal parameter value.
+
+Visualizations of the tuning parameters for each grid are shown in [Appendix: Tuning Parameter Visualizations].
+
+```{r}
+#| label: tbl-mod-res # label table
+#| tbl-cap: "Accuracy of Each Model" # name table
+#| echo: false
+
+abortion_metrics |> kable()
+```
+
+@tbl-mod-res ranks all eleven of the models based on accuracy. It shows that the feature engineered boosted tree model was the most accurate, with an accuracy of .8015. In other words, when fit to the folds, this model correctly predicted whether a survey participant thought abortion should be legal or banned 80.15% of the time. It isn't surprising that this was the best model, as the boosted tree model is the most complex of each of the models and the feature engineered recipe is the more complex recipe. However, this model wasn't better than the less complex models by a large margin, which does come as a surprise.
+
+## Final Model Analysis
+
+I fit the feature engineered boosted tree model to the testing data.
+
+```{r}
+#| label: tbl-perf # label table
+#| tbl-cap: "Performance Metrics of Final Model" # name table
+#| echo: false
+
+abortion_perf |> kable()
+
+abortion_curve + labs(title = "ROC Curve of Final Model")
+```
+
+As @tbl-perf shows, the final model has an accuracy of .8148. In other words, the model correctly predicted support for abortion 81.48% of the time.
+
+I also computed the area under the receiver operating characteristic curve (ROC AUC) as another accuracy metric for the final model. This area measures the true positive rate and ranges from 0 to 1, where 0 indicates that no predicted positives are actually positive, .50 indicates that half of predicted positives are actually positive (what would be obtained from random guessing), and 1 indicates that all predicted positives are actually positive, and that the model generated perfect predictions. The final model has a ROC AUC of .8873, indicating that 88.73% of the predicted positives are true positives.
+
+I also created a confusion matrix to count the true positives, true negatives, false positives, and false negatives.
+
+```{r}
+#| echo: false
+
+abortion_conf_mat
+```
+
+The confusion matrix shows that:
+
+-   479 participants were predicted to select and did select "banned"
+
+-   1131 participants were predicted to select and did select "legal"
+
+-   218 participants were predicted to select "legal" but selected "banned"
+
+-   148 participants were predicted to select "banned" but selected "legal"
+
+The matrix shows that the model's predictions were generally accurate when participants selected "legal," but were inaccurate almost a third of the time when participants selected "banned."
+
+While this model is good, the effort of building a predictive model might not necessarily pay off in this case. When the models were fitted to the folds, the accuracy of the feature engineered boosted tree model was less than .04 higher than that of the naive Bayes model (the simplest & worst-performing model), less than .03 higher than that of the k nearest neighbor models, and less than .01 higher than that of all of the other models. There really isn't a huge difference in the predictive power of the various models. It doesn't seem that this model has any particular features that make it better than the others, although boosted tree is the most complex model type used.
+
+## Conclusion
+
+Since all of the models had similar accuracy values, it seems that model type and number of parameters doesn't have a huge influence on the predictions. It's likely based on this analysis that there are a few predictor variables that are strong predictors for abortion views, while there are many predictors which don't provide a great deal more insight. In addition, similarities between some of the predictors, such as the similarities between political party and political spectrum, could render some of the predictors redundant. Overall, this model does predict whether Americans support abortion with high accuracy, and simpler versions of the model also result in accurate predictions.
+
+There are several next steps that could be taken. A more complex multinomial classification could be performed to uncover the distinctions between those who think abortion should be legal in all cases and those who only think it should be legal with proven need, and between those who think abortion should be banned in all cases and those who think exceptions should be provided. A different model could also take fewer, more, or different variables into account to determine which are most important in predicting support for abortion. Finally, threshold tuning could be performed to account for the class imbalance.
+
+## Appendix: List of Variables
+
+This is a complete list of the 30 predictor variables I used. The variables' descriptions are abbreviated when referenced in the report for increased clarity.
+
+**Categorical Variables:**
+
+-   "anger": how angry participant was regarding the US
+
+-   "education": highest level of education completed by participant
+
+-   "gender": participant's gender
+
+-   "gun ownership": whether or not participant owned guns
+
+-   "happiness": how happy participant was regarding the US
+
+-   "importance of checks and balances": importance of checks and balances in the federal government to participant
+
+-   "importance of religion": importance of religion to participant
+
+-   "level of political attention": level of attention participant paid to politics
+
+-   "political party": which political party participant identified as belonging to
+
+-   "political spectrum": where participant placed themselves on spectrum from liberal to conservative
+
+-   "presidential vote": who participant intended to vote for in the 2020 presidential election
+
+-   "race": participant's race or ethnicity
+
+-   "religion": participant's religion
+
+-   "right track": whether participant believed the US is on the right track
+
+-   "sexual orientation": participant's sexual orientation
+
+-   "support for birthright citizenship": whether participant supported birthright citizenship
+
+-   "support for climate action": whether participant believed more or less action should be taken to combat climate change
+
+-   "support for the death penalty": whether participant supported the death penalty
+
+-   "support for gay marriage": participant's view on gay marriage
+
+-   "support for impeachment": whether participant believed Donald Trump should be impeached
+
+-   "support for parental leave": whether participant supported paid parental leave
+
+-   "support for trans rights": whether the participant believed transgender people should be allowed to use the bathroom of their identified gender
+
+-   "trust of media": how much participant trusted the media
+
+-   "worry": how worried participant was regarding the US
+
+**Numerical Variables:**
+
+-   "age": participant's age
+
+-   "Democratic approval": how much participant approved of the Democratic Party
+
+-   "income": participant's yearly income
+
+-   "Republican approval": how much participant approved of the Republican Party
+
+-   "support for guaranteed income": how much participant supported government-provided guaranteed income
+
+-   "support for universal health insurance": how much participant supported universal or government-provided health insurance
+
+## Appendix: EDA[^2]
+
+[^2]: Note: I created more plots exploring the interactions between variables than are shown here. I only included the interaction plots that I used to create the feature engineered recipe.
+
+#### Distributions of Categorical Variables
+
+```{r}
+#| echo: false
+
+abortion_train |> filter(!is.na(education)) |>
+  ggplot(aes(x = education)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Education",
+       x = "Education",
+       y = "")
+
+abortion_train |> filter(!is.na(sex)) |>
+  ggplot(aes(x = sex)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Gender",
+       x = "Gender",
+       y = "")
+
+abortion_train |> filter(!is.na(guns)) |>
+  ggplot(aes(x = guns)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Gun Ownership",
+       x = "Gun Ownership",
+       y = "")
+
+abortion_train |> filter(!is.na(checks_balances)) |>
+  ggplot(aes(x = checks_balances)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Importance of Checks & Balances",
+       x = "Importance of Checks & Balances",
+       y = "")
+
+abortion_train |> filter(!is.na(religion_import)) |>
+  ggplot(aes(x = religion_import)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Importance of Religion",
+       x = "Importance of Religion",
+       y = "")
+
+abortion_train |> filter(!is.na(politic_attent)) |>
+  ggplot(aes(x = politic_attent)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Level of Political Attention",
+       x = "Level of Political Attention",
+       y = "")
+
+abortion_train |> filter(!is.na(party)) |>
+  ggplot(aes(x = party)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Political Party",
+       x = "Political Party",
+       y = "")
+
+abortion_train |> filter(!is.na(politic_scale)) |>
+  mutate(politic_scale = fct_recode(politic_scale,
+                                    "v. liberal" = "extremely liberal",
+                                    "slightly cons" = "slightly conservative",
+                                    "v. cons" = "extremely conservative")) |>
+  ggplot(aes(x = politic_scale)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Political Spectrum",
+       x = "Political Spectrum",
+       y = "")
+
+abortion_train |> filter(!is.na(president)) |>
+  ggplot(aes(x = president)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Presidential Vote",
+       x = "Presidential Vote",
+       y = "")
+
+abortion_train |> filter(!is.na(race)) |>
+  mutate(race = fct_recode(race,
+                           "apida" = "asian/pacific islander",
+                           "native american" = "native american/alaska native")) |>
+  ggplot(aes(x = race)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Race",
+       x = "Race",
+       y = "")
+
+abortion_train |> filter(!is.na(religion)) |>
+  ggplot(aes(x = religion)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Religion",
+       x = "Religion",
+       y = "")
+
+abortion_train |> filter(!is.na(right_track)) |>
+  ggplot(aes(x = right_track)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Right Track",
+       x = "Right Track",
+       y = "")
+
+abortion_train |> filter(!is.na(sexual_orientation)) |>
+  ggplot(aes(x = sexual_orientation)) +
+  geom_bar(color = "white",
+           fill = "green4") +
+  labs(title = "Distribution of Sexual Orientation",
+       x = "Sexual Orientation",
+       y = "")
+
+abortion_train |> filter(!is.na(trust_media)) |>
+  ggplot(aes(x = trust_media)) +
+  geom_bar(color = "white",
+           fill = "green4")  +
+  labs(title = "Distribution of Trust of Media",
+       x = "Trust of Media",
+       y = "")
+
+abortion_train |> filter(!is.na(birthright)) |>
+  ggplot(aes(x = birthright)) +
+  geom_bar(color = "white",
+           fill = "blue") +
+  labs(title = "Distribution of Support for Birthright Citizenship",
+       x = "Support for Birthright Citizenship",
+       y = "")
+
+abortion_train |> filter(!is.na(climate_action)) |>
+  ggplot(aes(x = climate_action)) +
+  geom_bar(color = "white",
+           fill = "blue")  +
+  labs(title = "Distribution of Support for Climate Action",
+       x = "Support for Climate Action",
+       y = "")
+
+abortion_train |> filter(!is.na(death_penalty)) |>
+  ggplot(aes(x = death_penalty)) +
+  geom_bar(color = "white",
+           fill = "blue")  +
+  labs(title = "Distribution of Support for the Death Penalty",
+       x = "Support for the Death Penalty",
+       y = "")
+
+abortion_train |> filter(!is.na(gay_marriage)) |>
+  ggplot(aes(x = gay_marriage)) +
+  geom_bar(color = "white",
+           fill = "blue")  +
+  labs(title = "Distribution of Support for Gay Marriage",
+       x = "Support for Gay Marriage",
+       y = "")
+
+abortion_train |> filter(!is.na(impeachment)) |>
+  ggplot(aes(x = impeachment)) +
+  geom_bar(color = "white",
+           fill = "blue")  +
+  labs(title = "Distribution of Support for Impeachment",
+       x = "Support for Impeachment",
+       y = "")
+
+abortion_train |> filter(!is.na(parental_leave)) |>
+  ggplot(aes(x = parental_leave)) +
+  geom_bar(color = "white",
+           fill = "blue")  +
+  labs(title = "Distribution of Support for Parental Leave",
+       x = "Support for Parental Leave",
+       y = "")
+
+abortion_train |> filter(!is.na(trans_bathroom)) |>
+  ggplot(aes(x = trans_bathroom)) +
+  geom_bar(color = "white",
+           fill = "blue")  +
+  labs(title = "Distribution of Support for Trans Rights",
+       x = "Support for Trans Rights",
+       y = "")
+```
+
+```{r}
+#| echo: false
+
+abortion_train |> filter(!is.na(angry)) |>
+  ggplot(aes(x = angry)) +
+  geom_bar(color = "white",
+           fill = "purple")  +
+  labs(title = "Distribution of Anger",
+       x = "Anger",
+       y = "")
+
+abortion_train |> filter(!is.na(happy)) |>
+  ggplot(aes(x = happy)) +
+  geom_bar(color = "white",
+           fill = "purple")  +
+  labs(title = "Distribution of Happiness",
+       x = "Happiness",
+       y = "")
+
+abortion_train |> filter(!is.na(worried)) |>
+  ggplot(aes(x = worried)) +
+  geom_bar(color = "white",
+           fill = "purple")  +
+  labs(title = "Distribution of Worry",
+       x = "Worry",
+       y = "")
+
+abortion_train |> filter(!is.na(worried), !is.na(angry)) |>
+  ggplot(aes(x = worried,
+             fill = angry)) +
+  geom_bar(color = "white") + 
+  labs(title = "Relationship Between Worry and Anger",
+       x = "Worry",
+       y = "",
+       fill = "Anger")
+
+abortion_train |> filter(!is.na(worried), !is.na(happy)) |> 
+  ggplot(aes(x = worried,
+                 fill = happy)) +
+  geom_bar(color = "white") + 
+  labs(title = "Relationship Between Worry and Happiness",
+       x = "Worry",
+       y = "",
+       fill = "Happiness")
+```
+
+A positive association is shown between worry and anger, where worried people tend to be more angry. A negative association is shown between worry and happiness, where worried people tend to be less happy and happy people tend to be less worried. Therefore I removed happiness and anger from the feature engineered recipes since the three variables measure similar attributes and have similar trends.
+
+#### Distributions of Numerical Variables
+
+```{r}
+#| echo: false
+#| warning: false
+
+abortion_train |> ggplot(aes(x = age)) +
+  geom_density(color = "green4") +
+  labs(title = "Distribution of Age",
+       x = "Age",
+       y = "")
+```
+
+Age doesn't benefit from any transformations.
+
+```{r}
+#| echo: false
+#| warning: false
+
+abortion_train |> ggplot(aes(x = income)) +
+  geom_density(color = "blue") +
+  labs(title = "Distribution of Income",
+       x = "Income",
+       y = "")
+
+abortion_train |> ggplot(aes(x = sqrt(income))) +
+  geom_density(color = "blue") +
+  labs(title = "Distribution of the Square Root of Income",
+       x = "Square Root of Income",
+       y = "")
+```
+
+The distribution of the square root of income is closer to normal than the distribution of income.
+
+```{r}
+#| echo: false
+#| warning: false
+
+abortion_train |> ggplot(aes(x = democratic)) +
+  geom_density(color = "purple")  +
+  labs(title = "Distribution of Democrat Approval",
+       x = "Democrat Approval",
+       y = "")
+
+abortion_train |> ggplot(aes(x = republican)) +
+  geom_density(color = "purple") +
+  labs(title = "Distribution of Republican Approval",
+       x = "Democrat Approval",
+       y = "")
+
+abortion_train |> ggplot(aes(x = democratic,
+                       y = republican)) + 
+  geom_point(color = "purple",
+             alpha = 0.2) +
+  labs(title = "Democrat Approval vs. Republican Approval",
+       x = "Age",
+       y = "")
+```
+
+Democrat approval and Republican approval don't benefit from any transformations. Plotting them against each other shows a negative relationship. The correlation value is found in [Appendix: Correlation & Cramer's V Analysis](#appendix-correlation-cramers-v-analysis).
+
+```{r}
+#| echo: false
+#| warning: false
+
+abortion_train |> ggplot(aes(x = health_insurance)) +
+  geom_density(color = "magenta3")  +
+  labs(title = "Distribution of Support for Universal Health Insurance",
+       x = "Support for Universal Health Insurance",
+       y = "")
+
+abortion_train |> ggplot(aes(x = guaran_income)) +
+  geom_density(color = "magenta3")  +
+  labs(title = "Distribution of Support for Guaranteed Income",
+       x = "Support for Guaranteed Income",
+       y = "")
+
+abortion_train |> ggplot(aes(x = health_insurance,
+                       y = guaran_income)) + 
+  geom_point(color = "magenta3",
+             alpha = 0.01) +
+  labs(title = "Support for Universal Health Insurance vs. Support for Guaranteed Income",
+       x = "Support for Universal Health Insurance",
+       y = "Support for Guaranteed Income")
+```
+
+Support for universal health insurance and support for guaranteed income don't benefit from any transformations. Plotting them against each other shows a positive relationship. The correlation value is found in [Appendix: Correlation & Cramer's V Analysis](#appendix-correlation-cramers-v-analysis).
+
+## Appendix: Correlation & Cramer's V Analysis {#appendix-correlation-cramers-v-analysis}
+
+```{r}
+#| label: tbl-cor # label table
+#| tbl-cap: "Correlation Between Numerical Predictor Variables" # name table
+#| echo: false
+
+cor_matrix |> kable()
+```
+
+@tbl-cor shows the correlation between each of the numerical predictors for abortion support.
+
+```{r}
+#| label: tbl-cv # label table
+#| tbl-cap: "Correlation Between Categorical Predictor Variables" # name table
+#| echo: false
+
+cv_matrix |> kable()
+```
+
+@tbl-cv shows the correlation between each of the categorical predictors for abortion support.
+
+## Appendix: Tuning Parameter Visualizations
+
+```{r}
+#| echo: false
+
+# elastic net
+autoplot(elastic_base_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the elastic net model with the baseline recipe. Accuracy remains fairly constant until regularization is increased to .01, when it sharply drops.
+
+```{r}
+#| echo: false
+
+autoplot(elastic_feat_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the elastic net model with the feature engineered recipe. Similarly to the previous plot, accuracy drops sharply when regularization is increased to .01. The models with penalty of 0 are generally more accurate.
+
+```{r}
+#| echo: false
+# random forest
+autoplot(rf_base_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the random forest model with the baseline recipe. Overall accuracy remains fairly constant. Accuracy increases as the number of randomly selected predictors increases, but doesn't have as strong a relationship to minimum node size.
+
+```{r}
+#| echo: false
+
+autoplot(rf_feat_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the random forest model with the feature engineered recipe. Similarly to the previous plot, accuracy remains fairly constant overall. Accuracy generally increases as the number of randomly selected predictors increases and doesn't have a clear relationship to minimum node size.
+
+```{r}
+#| echo: false
+
+autoplot(bt_base_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the boosted tree model with the baseline recipe. Accuracy generally increases as the number of randomly selected predictors increases, unless the learning rate is high, in which case fewer predictors can be better. Accuracy doesn't have a clear relationship to minimum node size.
+
+```{r}
+#| echo: false
+
+autoplot(bt_feat_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the boosted tree model with the feature engineered recipe. As with the previous plot, accuracy generally increases as the number of randomly selected predictors increases, unless the learning rate is high, in which case fewer predictors can be better. Accuracy doesn't have a clear relationship to minimum node size.
+
+```{r}
+#| echo: false
+#knn
+autoplot(knn_base_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the k nearest neighbor model with the baseline recipe. Accuracy increases as the number of nearest neighbors increases.
+
+```{r}
+#| echo: false
+
+autoplot(knn_feat_tune, metric = "accuracy")
+```
+
+This plot displays tuning parameters vs. accuracy for the k nearest neighbor model with the feature engineered recipe. As with the previous plot, accuracy increases as the number of nearest neighbors increases.
